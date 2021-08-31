@@ -68,3 +68,74 @@ message Error {
 	int32 code = 1;
 	string msg = 2;
 }
+
+// values are all in text format.
+message Row {
+	bytes handle = 1;
+	bytes data = 2;
+}
+
+// RowMeta contains row handle and length of a row.
+message RowMeta {
+	int64 handle = 1 ;
+	int64 length = 2 ;
+}
+
+// Chunk contains multiple rows data and rows meta.
+message Chunk {
+	// Data for all rows in the chunk.
+	bytes rows_data = 3 [(gogoproto.customtype) = "github.com/pingcap/kvproto/pkg/sharedbytes.SharedBytes", (gogoproto.nullable) = false];
+
+	// Meta data for every row.
+	repeated RowMeta rows_meta = 4 [(gogoproto.nullable) = false];
+}
+
+message ExecutorExecutionSummary {
+	// Total time cost in this executor. Includes self time cost and children time cost.
+	uint64 time_processed_ns = 1;
+
+	// How many rows this executor produced totally.
+	uint64 num_produced_rows = 2;
+
+	// How many times executor's `next()` is called.
+	uint64 num_iterations = 3;
+
+	// Coresponding executor id
+	string executor_id = 4;
+
+	// The execution concurrency for this executor
+	uint64 concurrency = 5;
+}
+
+enum EncodeType {
+	TypeDefault = 0;
+	TypeChunk = 1;
+	// TypeCHBlock is used by TiSpark and TiFlash, in this encode mode, TiFlash will encode the data using native ch block format
+	TypeCHBlock = 2;
+}
+
+// Response for SelectRequest.
+message SelectResponse {
+	Error error = 1;
+
+	// Result rows.
+	repeated Row rows = 2;
+
+	// Use multiple chunks to reduce memory allocation and
+	// avoid allocating large contiguous memory.
+	repeated Chunk chunks = 3 [(gogoproto.nullable) = false];
+	repeated Error warnings = 4;
+	repeated int64 output_counts = 5;
+	int64 warning_count = 6;
+
+	// Not used any more
+	// optional bytes row_batch_data = 7 [(gogoproto.customtype) = "github.com/pingcap/kvproto/pkg/sharedbytes.SharedBytes", (gogoproto.nullable) = false];
+
+	// The execution summary of each executor, in the order in request.
+	repeated ExecutorExecutionSummary execution_summaries = 8;
+	// It indicates the encode type of response.
+	EncodeType encode_type = 9;
+	// ndvs collects the number of distinct value information per range. It will be used to serve as execution feedback information.
+	// Helping us improve the table's statistics information.
+	repeated int64 ndvs = 10;
+}
